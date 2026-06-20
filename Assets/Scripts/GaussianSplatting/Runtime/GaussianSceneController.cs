@@ -14,7 +14,7 @@ namespace GaussianSplatting.Runtime
 
         [Header("Scene References")]
         [SerializeField]
-        private GaussianPointCloudRenderer pointCloudRenderer;
+        private GaussianBillboardRenderer billboardRenderer;
 
         private GaussianData[] _gaussians;
 
@@ -49,7 +49,7 @@ namespace GaussianSplatting.Runtime
                 }
                  
                 Debug.Log("Building point cloud mesh...", this);
-                pointCloudRenderer.Build(_gaussians);
+                billboardRenderer.Build(_gaussians);
                 Debug.Log("Point cloud render build complete.", this);
             }
             catch (System.Exception ex)
