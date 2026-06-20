@@ -6,17 +6,21 @@ namespace GaussianSplatting.Rendering
 {
     [RequireComponent(typeof(MeshFilter))]
     [RequireComponent(typeof(MeshRenderer))]
-
     public sealed class GaussianBillboardRenderer : MonoBehaviour
     {
         [SerializeField]
         private Material billboardMaterial;
 
         [SerializeField]
-        private float splatRadius = 0.01f;
+        private float radiusMultiplier = 1.0f;
+
+        [SerializeField]
+        private float minRadius = 0.001f;
+
+        [SerializeField]
+        private float maxRadius = 0.05f;
 
         private Mesh _mesh;
-
 
         public void Build(GaussianData[] gaussians)
         {
@@ -32,6 +36,7 @@ namespace GaussianSplatting.Rendering
 
             Vector3[] vertices = new Vector3[vertexCount];
             Vector2[] uv = new Vector2[vertexCount];
+            Vector2[] uv2 = new Vector2[vertexCount];
             Color[] colors = new Color[vertexCount];
             int[] indices = new int[indexCount];
 
@@ -42,6 +47,10 @@ namespace GaussianSplatting.Rendering
                 Color baseColor = g.GetApproxColor();
                 float alpha = g.GetOpacity();
                 Color finalColor = new Color(baseColor.r, baseColor.g, baseColor.b, alpha);
+
+                Vector3 scale = g.GetScale();
+                float radius = Mathf.Max(scale.x, Mathf.Max(scale.y, scale.z)) * radiusMultiplier;
+                radius = Mathf.Clamp(radius, minRadius, maxRadius);
 
                 int v = i * 4;
                 int t = i * 6;
@@ -57,6 +66,12 @@ namespace GaussianSplatting.Rendering
                 uv[v + 1] = new Vector2(1f, -1f);
                 uv[v + 2] = new Vector2(1f, 1f);
                 uv[v + 3] = new Vector2(-1f, 1f);
+
+                // uv2.x 用来传每个高斯自己的半径
+                uv2[v + 0] = new Vector2(radius, 0f);
+                uv2[v + 1] = new Vector2(radius, 0f);
+                uv2[v + 2] = new Vector2(radius, 0f);
+                uv2[v + 3] = new Vector2(radius, 0f);
 
                 colors[v + 0] = finalColor;
                 colors[v + 1] = finalColor;
@@ -88,6 +103,7 @@ namespace GaussianSplatting.Rendering
 
             _mesh.vertices = vertices;
             _mesh.uv = uv;
+            _mesh.uv2 = uv2;
             _mesh.colors = colors;
             _mesh.triangles = indices;
             _mesh.RecalculateBounds();
@@ -97,13 +113,7 @@ namespace GaussianSplatting.Rendering
 
             meshFilter.sharedMesh = _mesh;
             meshRenderer.sharedMaterial = billboardMaterial;
-
-            if (billboardMaterial != null)
-            {
-                billboardMaterial.SetFloat("_SplatRadius", splatRadius);
-            }
         }
-
 
         private void LateUpdate()
         {
@@ -117,7 +127,6 @@ namespace GaussianSplatting.Rendering
             billboardMaterial.SetVector("_CameraUpWS", cam.up);
         }
 
-
         private void OnDestroy()
         {
             if (_mesh != null)
@@ -129,6 +138,5 @@ namespace GaussianSplatting.Rendering
 #endif
             }
         }
-
     }
 }

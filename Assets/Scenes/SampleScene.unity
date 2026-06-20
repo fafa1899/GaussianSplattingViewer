@@ -327,7 +327,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   billboardMaterial: {fileID: 2100000, guid: 82cf233111f60404498a5a4134f51592, type: 2}
-  splatRadius: 0.01
+  radiusMultiplier: 1.5
+  minRadius: 0.001
+  maxRadius: 0.03
 --- !u!23 &362149367
 MeshRenderer:
   m_ObjectHideFlags: 0

@@ -1,45 +1,43 @@
 Shader "GaussianSplatting/Billboard"
 {
-	Properties
-	{
-		_SplatRadius ("Splat Radius", Float) = 0.01
-		_AlphaScale ("Alpha Scale", Float) = 1.0
-		_GaussianSharpness ("Gaussian Sharpness", Float) = 2.5
-	}
-
-	SubShader
+    Properties
     {
-		Tags
+        _AlphaScale ("Alpha Scale", Float) = 1.0
+        _GaussianSharpness ("Gaussian Sharpness", Float) = 2.5
+    }
+
+    SubShader
+    {
+        Tags
         {
             "Queue"="Transparent"
             "RenderType"="Transparent"
         }
 
-		Pass
+        Pass
         {
-			Blend SrcAlpha OneMinusSrcAlpha
+            Blend SrcAlpha OneMinusSrcAlpha
             ZWrite Off
             Cull Off
             ZTest LEqual
 
-			HLSLPROGRAM
-
-			#pragma vertex vert
+            HLSLPROGRAM
+            #pragma vertex vert
             #pragma fragment frag
             #pragma target 4.5
 
-			#include "UnityCG.cginc"
+            #include "UnityCG.cginc"
 
-			float _SplatRadius;
             float _AlphaScale;
             float _GaussianSharpness;
             float3 _CameraRightWS;
             float3 _CameraUpWS;
 
-			struct appdata
+            struct appdata
             {
                 float3 centerOS : POSITION;
                 float2 quadUV : TEXCOORD0;
+                float2 radiusData : TEXCOORD1;
                 float4 color : COLOR;
             };
 
@@ -50,15 +48,16 @@ Shader "GaussianSplatting/Billboard"
                 float4 color : COLOR;
             };
 
-
             v2f vert(appdata v)
             {
                 v2f o;
 
+                float radius = v.radiusData.x;
+
                 float3 centerWS = mul(unity_ObjectToWorld, float4(v.centerOS, 1.0)).xyz;
                 float3 offsetWS =
-                    _CameraRightWS * (v.quadUV.x * _SplatRadius) +
-                    _CameraUpWS * (v.quadUV.y * _SplatRadius);
+                    _CameraRightWS * (v.quadUV.x * radius) +
+                    _CameraUpWS * (v.quadUV.y * radius);
 
                 float3 positionWS = centerWS + offsetWS;
 
@@ -83,8 +82,7 @@ Shader "GaussianSplatting/Billboard"
 
                 return float4(i.color.rgb, alpha);
             }
-
-			ENDHLSL
-		}
-	}
+            ENDHLSL
+        }
+    }
 }
