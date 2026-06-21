@@ -12,13 +12,13 @@ namespace GaussianSplatting.Rendering
         private Material billboardMaterial;
 
         [SerializeField]
-        private float radiusMultiplier = 1.0f;
+        private float radiusMultiplier = 1.5f;
 
         [SerializeField]
         private float minRadius = 0.001f;
 
         [SerializeField]
-        private float maxRadius = 0.05f;
+        private float maxRadius = 0.03f;
 
         private Mesh _mesh;
 
@@ -27,6 +27,29 @@ namespace GaussianSplatting.Rendering
             if (gaussians == null || gaussians.Length == 0)
             {
                 Debug.LogWarning("No gaussian data to build billboard mesh.", this);
+                return;
+            }
+
+            int[] identityOrder = new int[gaussians.Length];
+            for (int i = 0; i < identityOrder.Length; i++)
+            {
+                identityOrder[i] = i;
+            }
+
+            Build(gaussians, identityOrder);           
+        }
+
+        public void Build(GaussianData[] gaussians, int[] sortedIndices)
+        {
+            if (gaussians == null || gaussians.Length == 0)
+            {
+                Debug.LogWarning("No gaussian data to build billboard mesh.", this);
+                return;
+            }
+
+            if (sortedIndices == null || sortedIndices.Length != gaussians.Length)
+            {
+                Debug.LogError("Sorted index array is null or length mismatch.", this);
                 return;
             }
 
@@ -40,9 +63,9 @@ namespace GaussianSplatting.Rendering
             Color[] colors = new Color[vertexCount];
             int[] indices = new int[indexCount];
 
-            for (int i = 0; i < quadCount; i++)
+            for (int drawIndex = 0; drawIndex < quadCount; drawIndex++)
             {
-                GaussianData g = gaussians[i];
+                GaussianData g = gaussians[sortedIndices[drawIndex]];
 
                 Color baseColor = g.GetApproxColor();
                 float alpha = g.GetOpacity();
@@ -52,8 +75,8 @@ namespace GaussianSplatting.Rendering
                 float radius = Mathf.Max(scale.x, Mathf.Max(scale.y, scale.z)) * radiusMultiplier;
                 radius = Mathf.Clamp(radius, minRadius, maxRadius);
 
-                int v = i * 4;
-                int t = i * 6;
+                int v = drawIndex * 4;
+                int t = drawIndex * 6;
 
                 Vector3 center = g.Position;
 

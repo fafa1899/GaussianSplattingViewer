@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 using GaussianSplatting.Core;
 using GaussianSplatting.IO;
@@ -17,6 +18,7 @@ namespace GaussianSplatting.Runtime
         private GaussianBillboardRenderer billboardRenderer;
 
         private GaussianData[] _gaussians;
+        private int[] _sortedIndices;
 
         private void Start()
         {
@@ -30,7 +32,7 @@ namespace GaussianSplatting.Runtime
                 Debug.Log("Reading gaussian data...", this);
 
                 _gaussians = GaussianPlyReader.ReadFirstVertices(
-                    plyFilePath,                   
+                    plyFilePath,
                     out PlyHeader header
                 );
 
@@ -47,15 +49,70 @@ namespace GaussianSplatting.Runtime
                 {
                     Debug.Log($"--- Vertex [{i}] ---\n{_gaussians[i]}", this);
                 }
-                 
-                Debug.Log("Building point cloud mesh...", this);
-                billboardRenderer.Build(_gaussians);
-                Debug.Log("Point cloud render build complete.", this);
+
+                RebuildBillboards();
             }
             catch (System.Exception ex)
             {
                 Debug.LogError($"Failed to load and render point cloud.\nPath: {plyFilePath}\nError: {ex}", this);
             }
+        }
+
+        private void RebuildBillboards()
+        {
+            if (billboardRenderer == null)
+            {
+                Debug.LogError("BillboardRenderer reference is missing.", this);
+                return;
+            }
+
+            Debug.Log("Sorting gaussians by camera depth...", this);
+            _sortedIndices = BuildDepthSortedIndices(_gaussians, Camera.main);
+            Debug.Log("Depth sort complete. Building billboard mesh...", this);
+            billboardRenderer.Build(_gaussians, _sortedIndices);
+        }
+
+        private static int[] BuildDepthSortedIndices(GaussianData[] gaussians, Camera camera)
+        {
+            int count = gaussians.Length;
+            int[] sortedIndices = new int[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                sortedIndices[i] = i;
+            }
+
+            if (camera == null)
+            {
+                return sortedIndices;
+            }
+
+            Transform camTransform = camera.transform;
+            Vector3 camPosition = camTransform.position;
+            Vector3 camForward = camTransform.forward;
+
+            Array.Sort(sortedIndices, (a, b) =>
+            {
+                float depthA = Vector3.Dot(gaussians[a].Position - camPosition, camForward);
+                float depthB = Vector3.Dot(gaussians[b].Position - camPosition, camForward);
+
+                // 远 -> 近
+                return depthB.CompareTo(depthA);
+            });
+
+            return sortedIndices;
+        }
+
+        [ContextMenu("Resort And Rebuild Billboards")]
+        public void ResortAndRebuildBillboards()
+        {
+            if (_gaussians == null || _gaussians.Length == 0)
+            {
+                Debug.LogWarning("No gaussian data loaded.", this);
+                return;
+            }
+
+            RebuildBillboards();
         }
     }
 }
