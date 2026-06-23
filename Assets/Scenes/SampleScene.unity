@@ -289,11 +289,9 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 362149365}
-  - component: {fileID: 362149368}
-  - component: {fileID: 362149367}
   - component: {fileID: 362149366}
   m_Layer: 0
-  m_Name: BillboardRenderer
+  m_Name: ProceduralRenderer
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -323,63 +321,13 @@ MonoBehaviour:
   m_GameObject: {fileID: 362149364}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e53321fed5edaed42ab66ac5b443c030, type: 3}
+  m_Script: {fileID: 11500000, guid: 0072849675949374e8a276f1a46fde3d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  billboardMaterial: {fileID: 2100000, guid: 82cf233111f60404498a5a4134f51592, type: 2}
+  proceduralMaterial: {fileID: 2100000, guid: 7cde3a78f3d7843478d4d283c86ef558, type: 2}
   radiusMultiplier: 1.5
   minRadius: 0.001
   maxRadius: 0.03
---- !u!23 &362149367
-MeshRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 362149364}
-  m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 2
-  m_RayTraceProcedural: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 0}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 0
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 3
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_AdditionalVertexStreams: {fileID: 0}
---- !u!33 &362149368
-MeshFilter:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 362149364}
-  m_Mesh: {fileID: 0}
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -544,7 +492,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   plyFilePath: D:\3DGS\Unity3DGS\models\bicycle\point_cloud\iteration_30000\point_cloud.ply
-  billboardRenderer: {fileID: 362149366}
+  proceduralRenderer: {fileID: 362149366}
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
