@@ -5,21 +5,21 @@ namespace GaussianSplatting.Rendering
 {
     public sealed class GaussianProceduralRenderer : MonoBehaviour
     {
+
         [SerializeField]
         private Material proceduralMaterial;
 
         [SerializeField]
-        private float radiusMultiplier = 1.5f;
+        private float scaleMultiplier = 1.5f;
 
         [SerializeField]
-        private float minRadius = 0.001f;
+        private float minScale = 0.0005f;
 
         [SerializeField]
-        private float maxRadius = 0.03f;
+        private float maxScale = 0.05f;
 
         private ComputeBuffer _gaussianBuffer;
         private int _gaussianCount;
-        private Bounds _bounds;
 
         public void Build(GaussianData[] gaussians)
         {
@@ -33,9 +33,6 @@ namespace GaussianSplatting.Rendering
 
             GaussianGpuData[] gpuData = new GaussianGpuData[gaussians.Length];
 
-            Vector3 min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
-            Vector3 max = new Vector3(float.MinValue, float.MinValue, float.MinValue);
-
             for (int i = 0; i < gaussians.Length; i++)
             {
                 GaussianData g = gaussians[i];
@@ -43,29 +40,27 @@ namespace GaussianSplatting.Rendering
                 Color baseColor = g.GetApproxColor();
                 float alpha = g.GetOpacity();
 
-                Vector3 scale = g.GetScale();
-                float radius = Mathf.Max(scale.x, Mathf.Max(scale.y, scale.z)) * radiusMultiplier;
-                radius = Mathf.Clamp(radius, minRadius, maxRadius);
+                Vector3 scale = g.GetScale() * scaleMultiplier;
+                scale.x = Mathf.Clamp(scale.x, minScale, maxScale);
+                scale.y = Mathf.Clamp(scale.y, minScale, maxScale);
+                scale.z = Mathf.Clamp(scale.z, minScale, maxScale);
 
+                Quaternion q = Quaternion.Normalize(g.Rotation);
+                       
                 gpuData[i] = new GaussianGpuData
                 {
                     Position = g.Position,
-                    Radius = radius,
+                    Padding0 = 0f,
+                    Scale = scale,
+                    Padding1 = 0f,
+                    Rotation = new Vector4(q.x, q.y, q.z, q.w),
                     Color = new Vector4(baseColor.r, baseColor.g, baseColor.b, alpha)
                 };
-
-                min = Vector3.Min(min, g.Position);
-                max = Vector3.Max(max, g.Position);
             }
 
             _gaussianCount = gpuData.Length;
-            _gaussianBuffer = new ComputeBuffer(_gaussianCount, 32);
+            _gaussianBuffer = new ComputeBuffer(_gaussianCount, 64);
             _gaussianBuffer.SetData(gpuData);
-
-            Vector3 center = (min + max) * 0.5f;
-            Vector3 size = max - min;
-            size += Vector3.one * 2f;
-            _bounds = new Bounds(center, size);
 
             if (proceduralMaterial != null)
             {
