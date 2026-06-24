@@ -34,6 +34,11 @@ namespace GaussianSplatting.Rendering
 
         public void Build(GaussianData[] gaussians)
         {
+            Build(gaussians, null);
+        }
+
+        public void Build(GaussianData[] gaussians, int[] sortedIndices)
+        {
             ReleaseBuffers();
 
             if (gaussians == null || gaussians.Length == 0)
@@ -45,6 +50,12 @@ namespace GaussianSplatting.Rendering
             if (chunkSize <= 0)
             {
                 Debug.LogError("Chunk size must be greater than 0.", this);
+                return;
+            }
+
+            if (sortedIndices != null && sortedIndices.Length != gaussians.Length)
+            {
+                Debug.LogError("Sorted index array length mismatch.", this);
                 return;
             }
 
@@ -63,7 +74,11 @@ namespace GaussianSplatting.Rendering
 
                 for (int i = 0; i < count; i++)
                 {
-                    GaussianData g = gaussians[start + i];
+                    int sourceIndex = sortedIndices != null
+                        ? sortedIndices[start + i]
+                        : start + i;
+
+                    GaussianData g = gaussians[sourceIndex];
 
                     Color baseColor = g.GetApproxColor();
                     float alpha = g.GetOpacity();

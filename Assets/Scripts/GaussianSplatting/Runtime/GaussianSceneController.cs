@@ -66,5 +66,62 @@ namespace GaussianSplatting.Runtime
                 Debug.LogError($"Failed to load procedural gaussian render.\nPath: {plyFilePath}\nError: {ex}", this);
             }
         }
+
+        [ContextMenu("Resort Procedural Gaussians")]
+        public void ResortProceduralGaussians()
+        {
+            if (_gaussians == null || _gaussians.Length == 0)
+            {
+                Debug.LogWarning("No gaussian data loaded.", this);
+                return;
+            }
+
+            if (proceduralRenderer == null)
+            {
+                Debug.LogError("ProceduralRenderer reference is missing.", this);
+                return;
+            }
+
+            Camera cam = Camera.main;
+            if (cam == null)
+            {
+                Debug.LogError("Main Camera not found.", this);
+                return;
+            }
+
+            Debug.Log("Sorting gaussians by current camera depth...", this);
+            int[] sortedIndices = BuildDepthSortedIndices(_gaussians, cam);
+
+            Debug.Log("Rebuilding procedural chunks with sorted indices...", this);
+            proceduralRenderer.Build(_gaussians, sortedIndices);
+
+            Debug.Log("Resort complete.", this);
+        }
+
+        private static int[] BuildDepthSortedIndices(GaussianData[] gaussians, Camera camera)
+        {
+            int count = gaussians.Length;
+            int[] sortedIndices = new int[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                sortedIndices[i] = i;
+            }
+
+            Transform camTransform = camera.transform;
+            Vector3 camPosition = camTransform.position;
+            Vector3 camForward = camTransform.forward;
+
+            Array.Sort(sortedIndices, (a, b) =>
+            {
+                float depthA = Vector3.Dot(gaussians[a].Position - camPosition, camForward);
+                float depthB = Vector3.Dot(gaussians[b].Position - camPosition, camForward);
+
+                // 远 -> 近
+                return depthB.CompareTo(depthA);
+            });
+
+            return sortedIndices;
+        }
     }
 }
