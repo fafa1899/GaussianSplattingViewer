@@ -325,9 +325,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   proceduralMaterial: {fileID: 2100000, guid: 7cde3a78f3d7843478d4d283c86ef558, type: 2}
-  radiusMultiplier: 1.5
-  minRadius: 0.001
-  maxRadius: 0.03
+  scaleMultiplier: 1.5
+  minScale: 0.0005
+  maxScale: 0.05
+  sigmaExtent: 3
+  r2Cutoff: 9
+  chunkSize: 1000000
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0

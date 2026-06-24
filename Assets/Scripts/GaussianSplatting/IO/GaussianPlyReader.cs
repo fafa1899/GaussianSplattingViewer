@@ -1,10 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.IO.MemoryMappedFiles;
-using GaussianSplatting.Core;
 using UnityEngine;
-using System.Buffers.Binary;
-using System.Runtime.InteropServices; 
 
 namespace GaussianSplatting.IO
 {
@@ -13,7 +10,7 @@ namespace GaussianSplatting.IO
         public static GaussianData[] ReadFirstVertices(string filePath, out PlyHeader header)
         {
             header = PlyHeader.Read(filePath);
-            
+
             if (header.Format != "binary_little_endian")
             {
                 throw new NotSupportedException($"Unsupported PLY format: {header.Format}");
@@ -37,21 +34,12 @@ namespace GaussianSplatting.IO
             int rot2Index = header.GetPropertyIndex("rot_2");
             int rot3Index = header.GetPropertyIndex("rot_3");
 
-            int fRest0Index = header.GetPropertyIndex("f_rest_0");
-            int fRest1Index = header.GetPropertyIndex("f_rest_1");
-            int fRest2Index = header.GetPropertyIndex("f_rest_2");
-            int fRest3Index = header.GetPropertyIndex("f_rest_3");
-            int fRest4Index = header.GetPropertyIndex("f_rest_4");
-            int fRest5Index = header.GetPropertyIndex("f_rest_5");
-            int fRest6Index = header.GetPropertyIndex("f_rest_6");
-            int fRest7Index = header.GetPropertyIndex("f_rest_7");
-            int fRest8Index = header.GetPropertyIndex("f_rest_8");
-            int fRest15Index = header.GetPropertyIndex("f_rest_15");
-            int fRest16Index = header.GetPropertyIndex("f_rest_16");
-            int fRest17Index = header.GetPropertyIndex("f_rest_17");
-            int fRest30Index = header.GetPropertyIndex("f_rest_30");
-            int fRest31Index = header.GetPropertyIndex("f_rest_31");
-            int fRest32Index = header.GetPropertyIndex("f_rest_32");
+            int[] fRestIndex = new int[45];
+            for (int i = 0; i < 45; i++)
+            {
+                fRestIndex[i] = header.GetPropertyIndex($"f_rest_{i}");
+                ValidateRequiredProperty(fRestIndex[i], $"f_rest_{i}");
+            }
 
             ValidateRequiredProperty(xIndex, "x");
             ValidateRequiredProperty(yIndex, "y");
@@ -67,16 +55,6 @@ namespace GaussianSplatting.IO
             ValidateRequiredProperty(rot1Index, "rot_1");
             ValidateRequiredProperty(rot2Index, "rot_2");
             ValidateRequiredProperty(rot3Index, "rot_3");
-
-            ValidateRequiredProperty(fRest0Index, "f_rest_0");
-            ValidateRequiredProperty(fRest1Index, "f_rest_1");
-            ValidateRequiredProperty(fRest2Index, "f_rest_2");
-            ValidateRequiredProperty(fRest3Index, "f_rest_3");
-            ValidateRequiredProperty(fRest4Index, "f_rest_4");
-            ValidateRequiredProperty(fRest5Index, "f_rest_5");
-            ValidateRequiredProperty(fRest6Index, "f_rest_6");
-            ValidateRequiredProperty(fRest7Index, "f_rest_7");
-            ValidateRequiredProperty(fRest8Index, "f_rest_8");
 
             // 使用内存映射文件，直接映射到虚拟地址空间，零拷贝
             using var mmf = MemoryMappedFile.CreateFromFile(filePath, FileMode.Open, null, 0, MemoryMappedFileAccess.Read);
@@ -111,21 +89,11 @@ namespace GaussianSplatting.IO
                     float rot2 = recordPtr[rot2Index];
                     float rot3 = recordPtr[rot3Index];
 
-                    float fr0 = recordPtr[fRest0Index];
-                    float fr1 = recordPtr[fRest1Index];
-                    float fr2 = recordPtr[fRest2Index];
-                    float fr3 = recordPtr[fRest3Index];
-                    float fr4 = recordPtr[fRest4Index];
-                    float fr5 = recordPtr[fRest5Index];
-                    float fr6 = recordPtr[fRest6Index];
-                    float fr7 = recordPtr[fRest7Index];
-                    float fr8 = recordPtr[fRest8Index];
-                    float fr15 = recordPtr[fRest15Index];
-                    float fr16 = recordPtr[fRest16Index];
-                    float fr17 = recordPtr[fRest17Index];
-                    float fr30 = recordPtr[fRest30Index];
-                    float fr31 = recordPtr[fRest31Index];
-                    float fr32 = recordPtr[fRest32Index];
+                    float[] fr = new float[45];
+                    for (int j = 0; j < 45; j++)
+                    {
+                        fr[j] = recordPtr[fRestIndex[j]];
+                    }
 
                     result[i] = new GaussianData
                     {
@@ -137,9 +105,21 @@ namespace GaussianSplatting.IO
                         //Rotation = new Quaternion(rot0, rot1, rot2, rot3)
                         //Rotation = new Quaternion(rot3, rot0, rot1, rot2)
 
-                        Sh1X = new Vector3(fr0, fr15, fr30), // 对应 -y
-                        Sh1Y = new Vector3(fr1, fr16, fr31), // 对应 +z
-                        Sh1Z = new Vector3(fr2, fr17, fr32)  // 对应 -x
+                        Sh01 = new Vector3(fr[0], fr[15], fr[30]),
+                        Sh02 = new Vector3(fr[1], fr[16], fr[31]),
+                        Sh03 = new Vector3(fr[2], fr[17], fr[32]),
+                        Sh04 = new Vector3(fr[3], fr[18], fr[33]),
+                        Sh05 = new Vector3(fr[4], fr[19], fr[34]),
+                        Sh06 = new Vector3(fr[5], fr[20], fr[35]),
+                        Sh07 = new Vector3(fr[6], fr[21], fr[36]),
+                        Sh08 = new Vector3(fr[7], fr[22], fr[37]),
+                        Sh09 = new Vector3(fr[8], fr[23], fr[38]),
+                        Sh10 = new Vector3(fr[9], fr[24], fr[39]),
+                        Sh11 = new Vector3(fr[10], fr[25], fr[40]),
+                        Sh12 = new Vector3(fr[11], fr[26], fr[41]),
+                        Sh13 = new Vector3(fr[12], fr[27], fr[42]),
+                        Sh14 = new Vector3(fr[13], fr[28], fr[43]),
+                        Sh15 = new Vector3(fr[14], fr[29], fr[44])
                     };
                 }
             }

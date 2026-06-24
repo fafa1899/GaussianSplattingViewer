@@ -42,9 +42,21 @@ Shader "GaussianSplatting/ProceduralBillboard"
                 float4 rotation; // xyzw
                 float4 color;    // rgba
 
-                float4 sh1X;
-                float4 sh1Y;
-                float4 sh1Z;
+                float4 sh01;
+                float4 sh02;
+                float4 sh03;
+                float4 sh04;
+                float4 sh05;
+                float4 sh06;
+                float4 sh07;
+                float4 sh08;
+                float4 sh09;
+                float4 sh10;
+                float4 sh11;
+                float4 sh12;
+                float4 sh13;
+                float4 sh14;
+                float4 sh15;
             };
 
             StructuredBuffer<GaussianData> _Gaussians;
@@ -66,9 +78,22 @@ Shader "GaussianSplatting/ProceduralBillboard"
                 float4 color : COLOR;
 
                 float3 centerWS : TEXCOORD2;
-                float3 sh1X : TEXCOORD3;
-                float3 sh1Y : TEXCOORD4;
-                float3 sh1Z : TEXCOORD5;
+
+                float3 sh01 : TEXCOORD3;
+                float3 sh02 : TEXCOORD4;
+                float3 sh03 : TEXCOORD5;
+                float3 sh04 : TEXCOORD6;
+                float3 sh05 : TEXCOORD7;
+                float3 sh06 : TEXCOORD8;
+                float3 sh07 : TEXCOORD9;
+                float3 sh08 : TEXCOORD10;
+                float3 sh09 : TEXCOORD11;
+                float3 sh10 : TEXCOORD12;
+                float3 sh11 : TEXCOORD13;
+                float3 sh12 : TEXCOORD14;
+                float3 sh13 : TEXCOORD15;
+                float3 sh14 : TEXCOORD16;
+                float3 sh15 : TEXCOORD17;
             };
 
             float2 GetCornerUV(uint vertexID)
@@ -97,22 +122,63 @@ Shader "GaussianSplatting/ProceduralBillboard"
                 );
             }
 
-            float3 EvaluateShColor(float3 baseColor, float3 sh1X, float3 sh1Y, float3 sh1Z, float3 viewDirWS)
+            float3 EvaluateShColor(
+                float3 baseColor,
+                float3 sh01, float3 sh02, float3 sh03,
+                float3 sh04, float3 sh05, float3 sh06, float3 sh07, float3 sh08,
+                float3 sh09, float3 sh10, float3 sh11, float3 sh12, float3 sh13, float3 sh14, float3 sh15,
+                float3 viewDirWS)
             {
                 // 和官方 sh_utils.py / eval_sh 的 1 阶形式对应
-                const float C0 = 0.28209479177387814;
                 const float C1 = 0.4886025119029199;
+
+                const float C2_0 = 1.0925484305920792;
+                const float C2_1 = -1.0925484305920792;
+                const float C2_2 = 0.31539156525252005;
+                const float C2_3 = -1.0925484305920792;
+                const float C2_4 = 0.5462742152960396;
+
+                const float C3_0 = -0.5900435899266435;
+                const float C3_1 = 2.890611442640554;
+                const float C3_2 = -0.4570457994644658;
+                const float C3_3 = 0.3731763325901154;
+                const float C3_4 = -0.4570457994644658;
+                const float C3_5 = 1.445305721320277;
+                const float C3_6 = -0.5900435899266435;
 
                 float x = viewDirWS.x;
                 float y = viewDirWS.y;
                 float z = viewDirWS.z;
+                float xx = x * x;
+                float yy = y * y;
+                float zz = z * z;
+                float xy = x * y;
+                float yz = y * z;
+                float xz = x * z;
 
-                // baseColor 当前已经是 f_dc * C0 + 0.5
-                // 所以这里只额外叠加一阶项
+                // baseColor 当前已经是 f_dc * C0 + 0.5             
                 float3 color = baseColor;
-                color += (-C1 * y) * sh1X;
-                color += ( C1 * z) * sh1Y;
-                color += (-C1 * x) * sh1Z;
+
+                // l = 1
+                color += (-C1 * y) * sh01;
+                color += ( C1 * z) * sh02;
+                color += (-C1 * x) * sh03;
+
+                // l = 2
+                color += (C2_0 * xy) * sh04;
+                color += (C2_1 * yz) * sh05;
+                color += (C2_2 * (2.0 * zz - xx - yy)) * sh06;
+                color += (C2_3 * xz) * sh07;
+                color += (C2_4 * (xx - yy)) * sh08;
+
+                // l = 3
+                color += (C3_0 * y * (3.0 * xx - yy)) * sh09;
+                color += (C3_1 * xy * z) * sh10;
+                color += (C3_2 * y * (4.0 * zz - xx - yy)) * sh11;
+                color += (C3_3 * z * (2.0 * zz - 3.0 * xx - 3.0 * yy)) * sh12;
+                color += (C3_4 * x * (4.0 * zz - xx - yy)) * sh13;
+                color += (C3_5 * z * (xx - yy)) * sh14;
+                color += (C3_6 * x * (xx - 3.0 * yy)) * sh15;
 
                 return color;
             }
@@ -202,9 +268,22 @@ Shader "GaussianSplatting/ProceduralBillboard"
                 o.invCov = float3(invA, invB, invC);
                 o.color = saturate(g.color);
                 o.centerWS = centerWS;
-                o.sh1X = g.sh1X.xyz;
-                o.sh1Y = g.sh1Y.xyz;
-                o.sh1Z = g.sh1Z.xyz;
+
+                o.sh01 = g.sh01.xyz;
+                o.sh02 = g.sh02.xyz;
+                o.sh03 = g.sh03.xyz;
+                o.sh04 = g.sh04.xyz;
+                o.sh05 = g.sh05.xyz;
+                o.sh06 = g.sh06.xyz;
+                o.sh07 = g.sh07.xyz;
+                o.sh08 = g.sh08.xyz;
+                o.sh09 = g.sh09.xyz;
+                o.sh10 = g.sh10.xyz;
+                o.sh11 = g.sh11.xyz;
+                o.sh12 = g.sh12.xyz;
+                o.sh13 = g.sh13.xyz;
+                o.sh14 = g.sh14.xyz;
+                o.sh15 = g.sh15.xyz;
 
                 return o;
             }
@@ -228,9 +307,9 @@ Shader "GaussianSplatting/ProceduralBillboard"
 
                 float3 shColor = EvaluateShColor(
                     i.color.rgb,
-                    i.sh1X,
-                    i.sh1Y,
-                    i.sh1Z,
+                    i.sh01, i.sh02, i.sh03,
+                    i.sh04, i.sh05, i.sh06, i.sh07, i.sh08,
+                    i.sh09, i.sh10, i.sh11, i.sh12, i.sh13, i.sh14, i.sh15,
                     viewDirWS
                 );
 

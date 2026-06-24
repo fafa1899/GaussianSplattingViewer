@@ -10,9 +10,22 @@ public struct GaussianData
     public Vector3 ScaleLog;
     public Quaternion Rotation;
 
-    public Vector3 Sh1X;
-    public Vector3 Sh1Y;
-    public Vector3 Sh1Z;
+    // 15 个高阶 SH 基底，每个 Vector3 表示 RGB
+    public Vector3 Sh01;
+    public Vector3 Sh02;
+    public Vector3 Sh03;
+    public Vector3 Sh04;
+    public Vector3 Sh05;
+    public Vector3 Sh06;
+    public Vector3 Sh07;
+    public Vector3 Sh08;
+    public Vector3 Sh09;
+    public Vector3 Sh10;
+    public Vector3 Sh11;
+    public Vector3 Sh12;
+    public Vector3 Sh13;
+    public Vector3 Sh14;
+    public Vector3 Sh15;
 
     public Color GetApproxColor()
     {
