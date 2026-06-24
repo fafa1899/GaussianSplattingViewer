@@ -61,12 +61,16 @@ namespace GaussianSplatting.Rendering
                     Scale = scale,
                     Padding1 = 0f,
                     Rotation = new Vector4(q.x, q.y, q.z, q.w),
-                    Color = new Vector4(baseColor.r, baseColor.g, baseColor.b, alpha)
+                    Color = new Vector4(baseColor.r, baseColor.g, baseColor.b, alpha),
+
+                    Sh1X = new Vector4(g.Sh1X.x, g.Sh1X.y, g.Sh1X.z, 0f),
+                    Sh1Y = new Vector4(g.Sh1Y.x, g.Sh1Y.y, g.Sh1Y.z, 0f),
+                    Sh1Z = new Vector4(g.Sh1Z.x, g.Sh1Z.y, g.Sh1Z.z, 0f)
                 };
             }
 
             _gaussianCount = gpuData.Length;
-            _gaussianBuffer = new ComputeBuffer(_gaussianCount, 64);
+            _gaussianBuffer = new ComputeBuffer(_gaussianCount, 112);
             _gaussianBuffer.SetData(gpuData);
 
             if (proceduralMaterial != null)

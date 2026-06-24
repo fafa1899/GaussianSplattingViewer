@@ -41,6 +41,10 @@ Shader "GaussianSplatting/ProceduralBillboard"
 
                 float4 rotation; // xyzw
                 float4 color;    // rgba
+
+                float4 sh1X;
+                float4 sh1Y;
+                float4 sh1Z;
             };
 
             StructuredBuffer<GaussianData> _Gaussians;
@@ -60,6 +64,11 @@ Shader "GaussianSplatting/ProceduralBillboard"
                 float2 planeOffset : TEXCOORD0;
                 float3 invCov : TEXCOORD1; // (a, b, c) for [a b; b c]
                 float4 color : COLOR;
+
+                float3 centerWS : TEXCOORD2;
+                float3 sh1X : TEXCOORD3;
+                float3 sh1Y : TEXCOORD4;
+                float3 sh1Z : TEXCOORD5;
             };
 
             float2 GetCornerUV(uint vertexID)
@@ -88,6 +97,25 @@ Shader "GaussianSplatting/ProceduralBillboard"
                 );
             }
 
+            float3 EvaluateShColor(float3 baseColor, float3 sh1X, float3 sh1Y, float3 sh1Z, float3 viewDirWS)
+            {
+                // 和官方 sh_utils.py / eval_sh 的 1 阶形式对应
+                const float C0 = 0.28209479177387814;
+                const float C1 = 0.4886025119029199;
+
+                float x = viewDirWS.x;
+                float y = viewDirWS.y;
+                float z = viewDirWS.z;
+
+                // baseColor 当前已经是 f_dc * C0 + 0.5
+                // 所以这里只额外叠加一阶项
+                float3 color = baseColor;
+                color += (-C1 * y) * sh1X;
+                color += ( C1 * z) * sh1Y;
+                color += (-C1 * x) * sh1Z;
+
+                return color;
+            }
 
             v2f vert(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
             {
@@ -173,6 +201,10 @@ Shader "GaussianSplatting/ProceduralBillboard"
                 o.planeOffset = planeOffset;
                 o.invCov = float3(invA, invB, invC);
                 o.color = saturate(g.color);
+                o.centerWS = centerWS;
+                o.sh1X = g.sh1X.xyz;
+                o.sh1Y = g.sh1Y.xyz;
+                o.sh1Z = g.sh1Z.xyz;
 
                 return o;
             }
@@ -182,7 +214,6 @@ Shader "GaussianSplatting/ProceduralBillboard"
                 float x = i.planeOffset.x;
                 float y = i.planeOffset.y;
 
-                // r2 = p^T * invCov * p
                 float r2 =
                     i.invCov.x * x * x +
                     2.0 * i.invCov.y * x * y +
@@ -193,10 +224,20 @@ Shader "GaussianSplatting/ProceduralBillboard"
                     discard;
                 }
 
+                float3 viewDirWS = normalize(_WorldSpaceCameraPos.xyz - i.centerWS);
+
+                float3 shColor = EvaluateShColor(
+                    i.color.rgb,
+                    i.sh1X,
+                    i.sh1Y,
+                    i.sh1Z,
+                    viewDirWS
+                );
+
                 float gaussian = exp(-0.5 * r2 * _GaussianSharpness);
                 float alpha = i.color.a * gaussian * _AlphaScale;
 
-                return float4(i.color.rgb, alpha);
+                return float4(saturate(shColor), alpha);
             }
 
             ENDHLSL

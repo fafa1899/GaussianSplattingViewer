@@ -14,5 +14,9 @@ namespace GaussianSplatting.Core
 
         public Vector4 Rotation;
         public Vector4 Color;
+
+        public Vector4 Sh1X;
+        public Vector4 Sh1Y;
+        public Vector4 Sh1Z;
     }
 }
