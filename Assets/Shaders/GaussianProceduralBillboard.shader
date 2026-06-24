@@ -3,7 +3,9 @@ Shader "GaussianSplatting/ProceduralBillboard"
 	Properties
     {
         _AlphaScale ("Alpha Scale", Float) = 1.0
-        _GaussianSharpness ("Gaussian Sharpness", Float) = 2.5
+        _GaussianSharpness ("Gaussian Sharpness", Float) = 1.0
+        _SigmaExtent ("Sigma Extent", Float) = 3.0
+        _R2Cutoff ("R2 Cutoff", Float) = 9.0
     }
 
     SubShader
@@ -45,6 +47,9 @@ Shader "GaussianSplatting/ProceduralBillboard"
 
             float _AlphaScale;
             float _GaussianSharpness;
+            float _SigmaExtent;
+            float _R2Cutoff;
+
             float4x4 _LocalToWorld;
             float3 _CameraRightWS;
             float3 _CameraUpWS;
@@ -52,7 +57,8 @@ Shader "GaussianSplatting/ProceduralBillboard"
             struct v2f
             {
                 float4 positionCS : SV_POSITION;
-                float2 ellipseUV : TEXCOORD0;
+                float2 planeOffset : TEXCOORD0;
+                float3 invCov : TEXCOORD1; // (a, b, c) for [a b; b c]
                 float4 color : COLOR;
             };
 
@@ -74,6 +80,15 @@ Shader "GaussianSplatting/ProceduralBillboard"
                 return v + q.w * t + cross(q.xyz, t);
             }
 
+            float2x2 Outer(float2 v)
+            {
+                return float2x2(
+                    v.x * v.x, v.x * v.y,
+                    v.y * v.x, v.y * v.y
+                );
+            }
+
+
             v2f vert(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
             {
                 v2f o;
@@ -92,37 +107,71 @@ Shader "GaussianSplatting/ProceduralBillboard"
                     q = float4(0, 0, 0, 1);
                 }
 
-                // 先取局部两个主轴。当前先用 x/y 两个轴近似椭圆。
-                float3 localAxisX = float3(g.scale.x, 0, 0);
-                float3 localAxisY = float3(0, g.scale.y, 0);
+                // 三个局部主轴，带真实尺度
+                float3 axisX = RotateByQuaternion(float3(g.scale.x, 0, 0), q);
+                float3 axisY = RotateByQuaternion(float3(0, g.scale.y, 0), q);
+                float3 axisZ = RotateByQuaternion(float3(0, 0, g.scale.z), q);
 
-                float3 worldAxisX = RotateByQuaternion(localAxisX, q);
-                float3 worldAxisY = RotateByQuaternion(localAxisY, q);
+                // 投影到相机平面基底 right/up
+                float2 pX = float2(dot(axisX, _CameraRightWS), dot(axisX, _CameraUpWS));
+                float2 pY = float2(dot(axisY, _CameraRightWS), dot(axisY, _CameraUpWS));
+                float2 pZ = float2(dot(axisZ, _CameraRightWS), dot(axisZ, _CameraUpWS));
 
-                // 投影到相机平面基底（right/up）
-                float2 projAxisX = float2(
-                    dot(worldAxisX, _CameraRightWS),
-                    dot(worldAxisX, _CameraUpWS)
-                );
+                // 2D 协方差近似：Sigma = sum(axis_i * axis_i^T)
+                float2x2 cov = Outer(pX) + Outer(pY) + Outer(pZ);
 
-                float2 projAxisY = float2(
-                    dot(worldAxisY, _CameraRightWS),
-                    dot(worldAxisY, _CameraUpWS)
-                );
+                // 数值稳定
+                cov[0][0] += 1e-8;
+                cov[1][1] += 1e-8;
 
-                float2 inPlaneOffset =
-                    projAxisX * corner.x +
-                    projAxisY * corner.y;
+                float a = cov[0][0];
+                float b = cov[0][1];
+                float c = cov[1][1];
+
+                // 对称 2x2 矩阵特征分解
+                float trace = a + c;
+                float det = a * c - b * b;
+                float disc = sqrt(max(trace * trace * 0.25 - det, 0.0));
+
+                float lambda1 = max(trace * 0.5 + disc, 1e-8);
+                float lambda2 = max(trace * 0.5 - disc, 1e-8);
+
+                float2 dir1;
+                if (abs(b) > 1e-6)
+                {
+                    dir1 = normalize(float2(b, lambda1 - a));
+                }
+                else
+                {
+                    dir1 = (a >= c) ? float2(1, 0) : float2(0, 1);
+                }
+
+                float2 dir2 = float2(-dir1.y, dir1.x);
+
+                float extent1 = sqrt(lambda1) * _SigmaExtent;
+                float extent2 = sqrt(lambda2) * _SigmaExtent;
+
+                // quad 顶点在屏幕平面内的偏移（单位：camera plane world units）
+                float2 planeOffset =
+                    dir1 * (corner.x * extent1) +
+                    dir2 * (corner.y * extent2);
 
                 float3 centerWS = mul(_LocalToWorld, float4(g.position, 1.0)).xyz;
                 float3 offsetWS =
-                    _CameraRightWS * inPlaneOffset.x +
-                    _CameraUpWS * inPlaneOffset.y;
-
+                    _CameraRightWS * planeOffset.x +
+                    _CameraUpWS * planeOffset.y;
+                          
                 float3 positionWS = centerWS + offsetWS;
 
+                // 逆协方差，用于 fragment 里的二次型
+                float invDet = 1.0 / max(det, 1e-8);
+                float invA =  c * invDet;
+                float invB = -b * invDet;
+                float invC =  a * invDet;
+
                 o.positionCS = mul(UNITY_MATRIX_VP, float4(positionWS, 1.0));
-                o.ellipseUV = corner;
+                o.planeOffset = planeOffset;
+                o.invCov = float3(invA, invB, invC);
                 o.color = saturate(g.color);
 
                 return o;
@@ -130,15 +179,21 @@ Shader "GaussianSplatting/ProceduralBillboard"
 
             float4 frag(v2f i) : SV_Target
             {
-                // 当前用椭圆局部坐标做高斯衰减
-                float r2 = dot(i.ellipseUV, i.ellipseUV);
+                float x = i.planeOffset.x;
+                float y = i.planeOffset.y;
 
-                if (r2 > 1.0)
+                // r2 = p^T * invCov * p
+                float r2 =
+                    i.invCov.x * x * x +
+                    2.0 * i.invCov.y * x * y +
+                    i.invCov.z * y * y;
+
+                if (r2 > _R2Cutoff)
                 {
                     discard;
                 }
 
-                float gaussian = exp(-r2 * _GaussianSharpness);
+                float gaussian = exp(-0.5 * r2 * _GaussianSharpness);
                 float alpha = i.color.a * gaussian * _AlphaScale;
 
                 return float4(i.color.rgb, alpha);

@@ -18,6 +18,13 @@ namespace GaussianSplatting.Rendering
         [SerializeField]
         private float maxScale = 0.05f;
 
+        [Header("Gaussian Shape")]
+        [SerializeField]
+        private float sigmaExtent = 3.0f;
+
+        [SerializeField]
+        private float r2Cutoff = 9.0f;
+
         private ComputeBuffer _gaussianBuffer;
         private int _gaussianCount;
 
@@ -65,6 +72,8 @@ namespace GaussianSplatting.Rendering
             if (proceduralMaterial != null)
             {
                 proceduralMaterial.SetBuffer("_Gaussians", _gaussianBuffer);
+                proceduralMaterial.SetFloat("_SigmaExtent", sigmaExtent);
+                proceduralMaterial.SetFloat("_R2Cutoff", r2Cutoff);
             }
         }
 
@@ -85,6 +94,8 @@ namespace GaussianSplatting.Rendering
             proceduralMaterial.SetMatrix("_LocalToWorld", transform.localToWorldMatrix);
             proceduralMaterial.SetVector("_CameraRightWS", currentCamera.transform.right);
             proceduralMaterial.SetVector("_CameraUpWS", currentCamera.transform.up);
+            proceduralMaterial.SetFloat("_SigmaExtent", sigmaExtent);
+            proceduralMaterial.SetFloat("_R2Cutoff", r2Cutoff);
 
             proceduralMaterial.SetPass(0);
             Graphics.DrawProceduralNow(MeshTopology.Triangles, 6, _gaussianCount);

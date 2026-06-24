@@ -93,6 +93,8 @@ namespace GaussianSplatting.IO
                         OpacityRaw = opacity,
                         ScaleLog = new Vector3(scale0, scale1, scale2),
                         Rotation = new Quaternion(rot1, rot2, rot3, rot0)
+                        //Rotation = new Quaternion(rot0, rot1, rot2, rot3)
+                        //Rotation = new Quaternion(rot3, rot0, rot1, rot2)                      
                     };
                 }
             }
