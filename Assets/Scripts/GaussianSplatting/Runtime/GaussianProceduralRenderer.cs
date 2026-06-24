@@ -53,13 +53,14 @@ namespace GaussianSplatting.Rendering
                 return;
             }
 
-            if (sortedIndices != null && sortedIndices.Length != gaussians.Length)
+            if (sortedIndices != null && sortedIndices.Length == 0)
             {
-                Debug.LogError("Sorted index array length mismatch.", this);
+                Debug.LogWarning("Sorted index array is empty.", this);
+                ReleaseBuffers();
                 return;
             }
-
-            int totalCount = gaussians.Length;
+                    
+            int totalCount = sortedIndices != null ? sortedIndices.Length : gaussians.Length;
             int chunkCount = Mathf.CeilToInt(totalCount / (float)chunkSize);
 
             _gaussianBuffers = new ComputeBuffer[chunkCount];
