@@ -1,4 +1,5 @@
-﻿using GaussianSplatting.Core;
+﻿using System;
+using GaussianSplatting.Core;
 using UnityEngine;
 
 namespace GaussianSplatting.Rendering
@@ -35,6 +36,9 @@ namespace GaussianSplatting.Rendering
         private ComputeBuffer _depthKeyBuffer;
 
         private int _activeIndexCount;
+
+        private ComputeBuffer _visibleDepthKeyBuffer;
+        private ComputeBuffer _visibleCountReadbackBuffer;
 
         public void Build(GaussianData[] gaussians)
         {
@@ -104,6 +108,12 @@ namespace GaussianSplatting.Rendering
             _indexBuffer.SetData(identityIndices);
 
             _depthKeyBuffer = new ComputeBuffer(_gaussianCount, 16);
+
+            _visibleDepthKeyBuffer = new ComputeBuffer(_gaussianCount, 16, ComputeBufferType.Append);
+            _visibleDepthKeyBuffer.SetCounterValue(0);
+
+            // CopyCount 的目标缓冲，DX11 下用 Raw 最稳
+            _visibleCountReadbackBuffer = new ComputeBuffer(1, sizeof(uint), ComputeBufferType.Raw);
 
             _activeIndexCount = _gaussianCount;
 
@@ -195,8 +205,11 @@ namespace GaussianSplatting.Rendering
 
             int kernel = depthKeyCompute.FindKernel("CSMain");
 
+            _visibleDepthKeyBuffer.SetCounterValue(0);
+
             depthKeyCompute.SetBuffer(kernel, "_Gaussians", _gaussianBuffer);
             depthKeyCompute.SetBuffer(kernel, "_DepthKeys", _depthKeyBuffer);
+            depthKeyCompute.SetBuffer(kernel, "_VisibleDepthKeys", _visibleDepthKeyBuffer);
             depthKeyCompute.SetMatrix("_LocalToWorld", transform.localToWorldMatrix);
             depthKeyCompute.SetVector("_CameraPositionWS", camera.transform.position);
             depthKeyCompute.SetVector("_CameraForwardWS", camera.transform.forward);
@@ -207,6 +220,32 @@ namespace GaussianSplatting.Rendering
 
             int threadGroupCount = Mathf.CeilToInt(_gaussianCount / 256.0f);
             depthKeyCompute.Dispatch(kernel, threadGroupCount, 1, 1);
+        }
+
+        public GaussianDepthKey[] ReadBackVisibleDepthKeys(out int visibleCount)
+        {
+            visibleCount = 0;
+
+            if (_visibleDepthKeyBuffer == null || _visibleCountReadbackBuffer == null || _gaussianCount == 0)
+            {
+                Debug.LogWarning("Visible depth key buffer is not initialized.", this);
+                return null;
+            }
+
+            ComputeBuffer.CopyCount(_visibleDepthKeyBuffer, _visibleCountReadbackBuffer, 0);
+
+            uint[] countData = new uint[1];
+            _visibleCountReadbackBuffer.GetData(countData);
+            visibleCount = (int)countData[0];
+
+            if (visibleCount <= 0)
+            {
+                return Array.Empty<GaussianDepthKey>();
+            }
+
+            GaussianDepthKey[] result = new GaussianDepthKey[visibleCount];
+            _visibleDepthKeyBuffer.GetData(result, 0, 0, visibleCount);
+            return result;
         }
 
         public GaussianDepthKey[] ReadBackDepthKeys()
@@ -220,6 +259,39 @@ namespace GaussianSplatting.Rendering
             GaussianDepthKey[] result = new GaussianDepthKey[_gaussianCount];
             _depthKeyBuffer.GetData(result);
             return result;
+        }
+
+        public void UpdateVisiblePrefixIndices(int[] visibleSortedIndices)
+        {
+            if (_indexBuffer == null || _gaussianCount == 0)
+            {
+                Debug.LogWarning("Index buffer is not initialized.", this);
+                return;
+            }
+
+            if (visibleSortedIndices == null)
+            {
+                Debug.LogError("Visible sorted index array is null.", this);
+                return;
+            }
+
+            int visibleCount = visibleSortedIndices.Length;
+            if (visibleCount == 0)
+            {
+                _activeIndexCount = 0;
+                return;
+            }
+
+            uint[] gpuIndices = new uint[visibleCount];
+            for (int i = 0; i < visibleCount; i++)
+            {
+                gpuIndices[i] = (uint)visibleSortedIndices[i];
+            }
+
+            // 只更新 buffer 前 visibleCount 个元素
+            _indexBuffer.SetData(gpuIndices, 0, 0, visibleCount);
+
+            _activeIndexCount = Mathf.Clamp(visibleCount, 0, _gaussianCount);
         }
 
         private void OnRenderObject()
@@ -276,6 +348,18 @@ namespace GaussianSplatting.Rendering
             {
                 _depthKeyBuffer.Release();
                 _depthKeyBuffer = null;
+            }
+
+            if (_visibleDepthKeyBuffer != null)
+            {
+                _visibleDepthKeyBuffer.Release();
+                _visibleDepthKeyBuffer = null;
+            }
+
+            if (_visibleCountReadbackBuffer != null)
+            {
+                _visibleCountReadbackBuffer.Release();
+                _visibleCountReadbackBuffer = null;
             }
 
             _gaussianCount = 0;

@@ -38,6 +38,7 @@ struct DepthKey
 
 StructuredBuffer<GaussianData> _Gaussians;
 RWStructuredBuffer<DepthKey> _DepthKeys;
+AppendStructuredBuffer<DepthKey> _VisibleDepthKeys;
 
 float4x4 _LocalToWorld;
 float4x4 _ViewProj;
@@ -108,4 +109,9 @@ void CSMain(uint3 id : SV_DispatchThreadID)
     key.padding = 0;
 
     _DepthKeys[index] = key;
+    
+    if (visible != 0)
+    {
+        _VisibleDepthKeys.Append(key);
+    }
 }

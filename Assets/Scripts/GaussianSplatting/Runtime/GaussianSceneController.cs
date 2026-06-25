@@ -200,6 +200,72 @@ namespace GaussianSplatting.Runtime
             Debug.Log("GPU visible subset + CPU sort resort complete.", this);
         }
 
+        [ContextMenu("Resort Procedural Gaussians (GPU Compacted Visible + CPU Sort)")]
+        public void ResortProceduralGaussiansGpuCompactedVisibleCpuSort()
+        {
+            if (_gaussians == null || _gaussians.Length == 0)
+            {
+                Debug.LogWarning("No gaussian data loaded.", this);
+                return;
+            }
+
+            if (proceduralRenderer == null)
+            {
+                Debug.LogError("ProceduralRenderer reference is missing.", this);
+                return;
+            }
+
+            Camera cam = Camera.main;
+            if (cam == null)
+            {
+                Debug.LogError("Main Camera not found.", this);
+                return;
+            }
+
+            Debug.Log("Generating GPU depth keys with compacted visible output...", this);
+            proceduralRenderer.GenerateDepthKeys(cam);
+
+            Debug.Log("Reading back compacted visible depth keys...", this);
+            GaussianDepthKey[] visibleKeys = proceduralRenderer.ReadBackVisibleDepthKeys(out int visibleCount);
+            if (visibleKeys == null)
+            {
+                Debug.LogWarning("Visible depth key readback returned null.", this);
+                return;
+            }
+
+            Debug.Log($"Visible compacted subset count: {visibleCount} / {_gaussians.Length}", this);
+
+            if (visibleCount == 0)
+            {
+                Debug.LogWarning("Visible compacted subset is empty.", this);
+                return;
+            }
+
+            Debug.Log("Sorting compacted visible keys on CPU...", this);
+            Array.Sort(visibleKeys, (a, b) =>
+            {
+                // 远 -> 近
+                return b.Depth.CompareTo(a.Depth);
+            });
+
+            int[] visibleSortedIndices = new int[visibleCount];
+            for (int i = 0; i < visibleCount; i++)
+            {
+                visibleSortedIndices[i] = (int)visibleKeys[i].Index;
+            }
+
+            Debug.Log("Updating visible prefix indices...", this);
+            proceduralRenderer.UpdateVisiblePrefixIndices(visibleSortedIndices);
+
+            int previewCount = Mathf.Min(10, visibleCount);
+            for (int i = 0; i < previewCount; i++)
+            {
+                Debug.Log($"CompactedVisibleKey[{i}] => depth={visibleKeys[i].Depth}, index={visibleKeys[i].Index}", this);
+            }
+
+            Debug.Log("GPU compacted visible + CPU sort resort complete.", this);
+        }
+
         private static int[] BuildDepthSortedIndices(
             GaussianData[] gaussians,
             Camera camera,
