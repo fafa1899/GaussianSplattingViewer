@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Text;
 using GaussianSplatting.Core;
 using GaussianSplatting.IO;
 using GaussianSplatting.Rendering;
@@ -105,6 +103,107 @@ namespace GaussianSplatting.Runtime
             proceduralRenderer.UpdateIndices(sortedIndices);
 
             Debug.Log("Resort complete.", this);
+        }
+
+        [ContextMenu("Generate GPU Depth Keys Preview")]
+        public void GenerateGpuDepthKeysPreview()
+        {
+            if (_gaussians == null || _gaussians.Length == 0)
+            {
+                Debug.LogWarning("No gaussian data loaded.", this);
+                return;
+            }
+
+            if (proceduralRenderer == null)
+            {
+                Debug.LogError("ProceduralRenderer reference is missing.", this);
+                return;
+            }
+
+            Camera cam = Camera.main;
+            if (cam == null)
+            {
+                Debug.LogError("Main Camera not found.", this);
+                return;
+            }
+
+            Debug.Log("Dispatching GPU depth key compute...", this);
+            proceduralRenderer.GenerateDepthKeys(cam);
+
+            GaussianDepthKey[] keys = proceduralRenderer.ReadBackDepthKeys();
+            if (keys == null || keys.Length == 0)
+            {
+                Debug.LogWarning("No depth keys read back.", this);
+                return;
+            }
+
+            int previewCount = Mathf.Min(10, keys.Length);
+            for (int i = 0; i < previewCount; i++)
+            {
+                Debug.Log($"DepthKey[{i}] => depth={keys[i].Depth}, index={keys[i].Index}", this);
+            }
+
+            Debug.Log("GPU depth key preview complete.", this);
+        }
+
+        [ContextMenu("Resort Procedural Gaussians (GPU Keys + CPU Sort)")]
+        public void ResortProceduralGaussiansGpuKeysCpuSort()
+        {
+            if (_gaussians == null || _gaussians.Length == 0)
+            {
+                Debug.LogWarning("No gaussian data loaded.", this);
+                return;
+            }
+
+            if (proceduralRenderer == null)
+            {
+                Debug.LogError("ProceduralRenderer reference is missing.", this);
+                return;
+            }
+
+            Camera cam = Camera.main;
+            if (cam == null)
+            {
+                Debug.LogError("Main Camera not found.", this);
+                return;
+            }
+
+            Debug.Log("Generating GPU depth keys...", this);
+            proceduralRenderer.GenerateDepthKeys(cam);
+
+
+            Debug.Log("Reading back depth keys...", this);
+            GaussianDepthKey[] keys = proceduralRenderer.ReadBackDepthKeys();
+            if (keys == null || keys.Length == 0)
+            {
+                Debug.LogWarning("No depth keys read back.", this);
+                return;
+            }
+
+            Debug.Log("Sorting depth keys on CPU...", this);
+
+            Array.Sort(keys, (a, b) =>
+            {
+                // 远 -> 近
+                return b.Depth.CompareTo(a.Depth);
+            });
+
+            int[] sortedIndices = new int[keys.Length];
+            for (int i = 0; i < keys.Length; i++)
+            {
+                sortedIndices[i] = (int)keys[i].Index;
+            }
+
+            Debug.Log("Updating index buffer...", this);
+            proceduralRenderer.UpdateIndices(sortedIndices);
+
+            int previewCount = Mathf.Min(10, keys.Length);
+            for (int i = 0; i < previewCount; i++)
+            {
+                Debug.Log($"SortedDepthKey[{i}] => depth={keys[i].Depth}, index={keys[i].Index}", this);
+            }
+
+            Debug.Log("GPU key + CPU sort resort complete.", this);
         }
 
         private static int[] BuildDepthSortedIndices(

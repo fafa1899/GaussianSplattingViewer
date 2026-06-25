@@ -25,10 +25,14 @@ namespace GaussianSplatting.Rendering
         [SerializeField]
         private float r2Cutoff = 9.0f;
 
+        [SerializeField]
+        private ComputeShader depthKeyCompute;
+
         private ComputeBuffer _gaussianBuffer;
         private ComputeBuffer _indexBuffer;
         private int _gaussianCount;
 
+        private ComputeBuffer _depthKeyBuffer;
 
         public void Build(GaussianData[] gaussians)
         {
@@ -97,6 +101,8 @@ namespace GaussianSplatting.Rendering
             _indexBuffer = new ComputeBuffer(_gaussianCount, sizeof(uint));
             _indexBuffer.SetData(identityIndices);
 
+            _depthKeyBuffer = new ComputeBuffer(_gaussianCount, 8);
+
             if (proceduralMaterial != null)
             {
                 proceduralMaterial.SetBuffer("_Gaussians", _gaussianBuffer);
@@ -153,6 +159,52 @@ namespace GaussianSplatting.Rendering
             _indexBuffer.SetData(identity);
         }
 
+        public void GenerateDepthKeys(Camera camera)
+        {
+            if (depthKeyCompute == null)
+            {
+                Debug.LogError("Depth key compute shader is missing.", this);
+                return;
+            }
+
+            if (_gaussianBuffer == null || _depthKeyBuffer == null || _gaussianCount == 0)
+            {
+                Debug.LogWarning("Gaussian buffers are not initialized.", this);
+                return;
+            }
+
+            if (camera == null)
+            {
+                Debug.LogError("Camera is null.", this);
+                return;
+            }
+
+            int kernel = depthKeyCompute.FindKernel("CSMain");
+
+            depthKeyCompute.SetBuffer(kernel, "_Gaussians", _gaussianBuffer);
+            depthKeyCompute.SetBuffer(kernel, "_DepthKeys", _depthKeyBuffer);
+            depthKeyCompute.SetMatrix("_LocalToWorld", transform.localToWorldMatrix);
+            depthKeyCompute.SetVector("_CameraPositionWS", camera.transform.position);
+            depthKeyCompute.SetVector("_CameraForwardWS", camera.transform.forward);
+            depthKeyCompute.SetInt("_GaussianCount", _gaussianCount);
+
+            int threadGroupCount = Mathf.CeilToInt(_gaussianCount / 256.0f);
+            depthKeyCompute.Dispatch(kernel, threadGroupCount, 1, 1);
+        }
+
+        public GaussianDepthKey[] ReadBackDepthKeys()
+        {
+            if (_depthKeyBuffer == null || _gaussianCount == 0)
+            {
+                Debug.LogWarning("Depth key buffer is not initialized.", this);
+                return null;
+            }
+
+            GaussianDepthKey[] result = new GaussianDepthKey[_gaussianCount];
+            _depthKeyBuffer.GetData(result);
+            return result;
+        }
+
         private void OnRenderObject()
         {
             if (_gaussianBuffer == null || _indexBuffer == null || _gaussianCount == 0 || proceduralMaterial == null)
@@ -201,6 +253,12 @@ namespace GaussianSplatting.Rendering
             {
                 _indexBuffer.Release();
                 _indexBuffer = null;
+            }
+
+            if (_depthKeyBuffer != null)
+            {
+                _depthKeyBuffer.Release();
+                _depthKeyBuffer = null;
             }
 
             _gaussianCount = 0;

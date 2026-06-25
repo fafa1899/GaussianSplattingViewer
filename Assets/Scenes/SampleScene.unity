@@ -330,7 +330,7 @@ MonoBehaviour:
   maxScale: 0.05
   sigmaExtent: 3
   r2Cutoff: 9
-  chunkSize: 1000000
+  depthKeyCompute: {fileID: 7200000, guid: f41c81a9d64b54b46baacc227cb6178b, type: 3}
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -496,6 +496,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   plyFilePath: D:\3DGS\Unity3DGS\models\bicycle\point_cloud\iteration_30000\point_cloud.ply
   proceduralRenderer: {fileID: 362149366}
+  maxViewDistance: 8
+  viewportMargin: 0.15
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0

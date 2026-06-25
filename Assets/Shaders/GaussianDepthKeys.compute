@@ -1,0 +1,66 @@
+#pragma kernel CSMain
+
+struct GaussianData
+{
+    float3 position;
+    float padding0;
+
+    float3 scale;
+    float padding1;
+
+    float4 rotation;
+    float4 color;
+
+    float4 sh01;
+    float4 sh02;
+    float4 sh03;
+    float4 sh04;
+    float4 sh05;
+    float4 sh06;
+    float4 sh07;
+    float4 sh08;
+    float4 sh09;
+    float4 sh10;
+    float4 sh11;
+    float4 sh12;
+    float4 sh13;
+    float4 sh14;
+    float4 sh15;
+};
+
+struct DepthKey
+{
+    float depth;
+    uint index;
+};
+
+StructuredBuffer<GaussianData> _Gaussians;
+RWStructuredBuffer<DepthKey> _DepthKeys;
+
+float4x4 _LocalToWorld;
+float3 _CameraPositionWS;
+float3 _CameraForwardWS;
+uint _GaussianCount;
+
+[numthreads(256, 1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    uint index = id.x;
+    if (index >= _GaussianCount)
+    {
+        return;
+    }
+    
+    GaussianData g = _Gaussians[index];
+
+    float3 worldPos = mul(_LocalToWorld, float4(g.position, 1.0)).xyz;
+    float3 toPoint = worldPos - _CameraPositionWS;
+    
+    float depth = dot(toPoint, _CameraForwardWS);
+    
+    DepthKey key;
+    key.depth = depth;
+    key.index = index;
+
+    _DepthKeys[index] = key;
+}
