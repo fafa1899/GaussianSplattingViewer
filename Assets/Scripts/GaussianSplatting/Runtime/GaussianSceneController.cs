@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using GaussianSplatting.Core;
 using GaussianSplatting.IO;
 using GaussianSplatting.Rendering;
@@ -105,47 +106,6 @@ namespace GaussianSplatting.Runtime
             Debug.Log("Resort complete.", this);
         }
 
-        [ContextMenu("Generate GPU Depth Keys Preview")]
-        public void GenerateGpuDepthKeysPreview()
-        {
-            if (_gaussians == null || _gaussians.Length == 0)
-            {
-                Debug.LogWarning("No gaussian data loaded.", this);
-                return;
-            }
-
-            if (proceduralRenderer == null)
-            {
-                Debug.LogError("ProceduralRenderer reference is missing.", this);
-                return;
-            }
-
-            Camera cam = Camera.main;
-            if (cam == null)
-            {
-                Debug.LogError("Main Camera not found.", this);
-                return;
-            }
-
-            Debug.Log("Dispatching GPU depth key compute...", this);
-            proceduralRenderer.GenerateDepthKeys(cam);
-
-            GaussianDepthKey[] keys = proceduralRenderer.ReadBackDepthKeys();
-            if (keys == null || keys.Length == 0)
-            {
-                Debug.LogWarning("No depth keys read back.", this);
-                return;
-            }
-
-            int previewCount = Mathf.Min(10, keys.Length);
-            for (int i = 0; i < previewCount; i++)
-            {
-                Debug.Log($"DepthKey[{i}] => depth={keys[i].Depth}, index={keys[i].Index}", this);
-            }
-
-            Debug.Log("GPU depth key preview complete.", this);
-        }
-
         [ContextMenu("Resort Procedural Gaussians (GPU Keys + CPU Sort)")]
         public void ResortProceduralGaussiansGpuKeysCpuSort()
         {
@@ -204,6 +164,87 @@ namespace GaussianSplatting.Runtime
             }
 
             Debug.Log("GPU key + CPU sort resort complete.", this);
+        }
+
+        [ContextMenu("Resort Procedural Gaussians (GPU Visible Subset + CPU Sort)")]
+        public void ResortProceduralGaussiansGpuVisibleSubsetCpuSort()
+        {
+            if (_gaussians == null || _gaussians.Length == 0)
+            {
+                Debug.LogWarning("No gaussian data loaded.", this);
+                return;
+            }
+
+            if (proceduralRenderer == null)
+            {
+                Debug.LogError("ProceduralRenderer reference is missing.", this);
+                return;
+            }
+
+            Camera cam = Camera.main;
+            if (cam == null)
+            {
+                Debug.LogError("Main Camera not found.", this);
+                return;
+            }
+
+            Debug.Log("Generating GPU depth keys with visible flags...", this);
+            proceduralRenderer.GenerateDepthKeys(cam);
+
+            Debug.Log("Reading back depth keys...", this);
+            GaussianDepthKey[] keys = proceduralRenderer.ReadBackDepthKeys();
+            if (keys == null || keys.Length == 0)
+            {
+                Debug.LogWarning("No depth keys read back.", this);
+                return;
+            }
+
+            List<GaussianDepthKey> visible = new List<GaussianDepthKey>(keys.Length / 4);
+            List<GaussianDepthKey> invisible = new List<GaussianDepthKey>(keys.Length);
+
+            for (int i = 0; i < keys.Length; i++)
+            {
+                if (keys[i].Visible != 0)
+                {
+                    visible.Add(keys[i]);
+                }
+                else
+                {
+                    invisible.Add(keys[i]);
+                }
+            }
+
+            Debug.Log($"Visible subset count: {visible.Count} / {keys.Length}", this);
+
+            visible.Sort((a, b) =>
+            {
+                // 远 -> 近
+                return b.Depth.CompareTo(a.Depth);
+            });
+
+            int[] sortedIndices = new int[keys.Length];
+            int cursor = 0;
+
+            for (int i = 0; i < visible.Count; i++)
+            {
+                sortedIndices[cursor++] = (int)visible[i].Index;
+            }
+
+            for (int i = 0; i < invisible.Count; i++)
+            {
+                sortedIndices[cursor++] = (int)invisible[i].Index;
+            }
+
+            Debug.Log("Updating index buffer...", this);
+            proceduralRenderer.UpdateIndices(sortedIndices);
+
+            int previewCount = Mathf.Min(10, visible.Count);
+            for (int i = 0; i < previewCount; i++)
+            {
+                Debug.Log($"VisibleSortedKey[{i}] => depth={visible[i].Depth}, index={visible[i].Index}", this);
+            }
+
+            Debug.Log("GPU visible subset + CPU sort resort complete.", this);
         }
 
         private static int[] BuildDepthSortedIndices(

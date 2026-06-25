@@ -101,7 +101,7 @@ namespace GaussianSplatting.Rendering
             _indexBuffer = new ComputeBuffer(_gaussianCount, sizeof(uint));
             _indexBuffer.SetData(identityIndices);
 
-            _depthKeyBuffer = new ComputeBuffer(_gaussianCount, 8);
+            _depthKeyBuffer = new ComputeBuffer(_gaussianCount, 16);
 
             if (proceduralMaterial != null)
             {
@@ -143,22 +143,6 @@ namespace GaussianSplatting.Rendering
             _indexBuffer.SetData(gpuIndices);
         }
 
-        public void ResetIdentityIndices()
-        {
-            if (_indexBuffer == null || _gaussianCount == 0)
-            {
-                return;
-            }
-
-            uint[] identity = new uint[_gaussianCount];
-            for (int i = 0; i < _gaussianCount; i++)
-            {
-                identity[i] = (uint)i;
-            }
-
-            _indexBuffer.SetData(identity);
-        }
-
         public void GenerateDepthKeys(Camera camera)
         {
             if (depthKeyCompute == null)
@@ -187,6 +171,9 @@ namespace GaussianSplatting.Rendering
             depthKeyCompute.SetVector("_CameraPositionWS", camera.transform.position);
             depthKeyCompute.SetVector("_CameraForwardWS", camera.transform.forward);
             depthKeyCompute.SetInt("_GaussianCount", _gaussianCount);
+            depthKeyCompute.SetMatrix("_ViewProj", camera.projectionMatrix * camera.worldToCameraMatrix);
+            depthKeyCompute.SetFloat("_MaxViewDistance", 8.0f);
+            depthKeyCompute.SetFloat("_ViewportMargin", 0.15f);
 
             int threadGroupCount = Mathf.CeilToInt(_gaussianCount / 256.0f);
             depthKeyCompute.Dispatch(kernel, threadGroupCount, 1, 1);

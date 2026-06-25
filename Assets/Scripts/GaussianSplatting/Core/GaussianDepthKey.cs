@@ -7,5 +7,7 @@ namespace GaussianSplatting.Core
     {
         public float Depth;
         public uint Index;
+        public uint Visible;
+        public uint Padding;
     }
 }
