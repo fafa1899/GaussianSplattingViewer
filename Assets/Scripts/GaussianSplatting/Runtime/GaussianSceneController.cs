@@ -98,15 +98,19 @@ namespace GaussianSplatting.Runtime
             }
 
             Debug.Log("Sorting gaussians by current camera depth...", this);
-            int[] sortedIndices = BuildDepthSortedIndices(_gaussians, cam);
+            int[] sortedIndices = BuildDepthSortedIndices(_gaussians, cam,
+                proceduralRenderer.transform.localToWorldMatrix);
 
             Debug.Log("Rebuilding procedural chunks with sorted indices...", this);
-            proceduralRenderer.Build(_gaussians, sortedIndices);
+            proceduralRenderer.UpdateIndices(sortedIndices);
 
             Debug.Log("Resort complete.", this);
         }
 
-        private static int[] BuildDepthSortedIndices(GaussianData[] gaussians, Camera camera)
+        private static int[] BuildDepthSortedIndices(
+            GaussianData[] gaussians,
+            Camera camera,
+            Matrix4x4 localToWorld)
         {
             int count = gaussians.Length;
             int[] sortedIndices = new int[count];
@@ -122,8 +126,11 @@ namespace GaussianSplatting.Runtime
 
             Array.Sort(sortedIndices, (a, b) =>
             {
-                float depthA = Vector3.Dot(gaussians[a].Position - camPosition, camForward);
-                float depthB = Vector3.Dot(gaussians[b].Position - camPosition, camForward);
+                Vector3 worldA = localToWorld.MultiplyPoint3x4(gaussians[a].Position);
+                Vector3 worldB = localToWorld.MultiplyPoint3x4(gaussians[b].Position);
+
+                float depthA = Vector3.Dot(worldA - camPosition, camForward);
+                float depthB = Vector3.Dot(worldB - camPosition, camForward);
 
                 // 远 -> 近
                 return depthB.CompareTo(depthA);
@@ -132,125 +139,125 @@ namespace GaussianSplatting.Runtime
             return sortedIndices;
         }
 
-        [ContextMenu("Resort Visible Subset Procedural Gaussians")]
-        public void ResortVisibleSubsetProceduralGaussians()
-        {
-            if (_gaussians == null || _gaussians.Length == 0)
-            {
-                Debug.LogWarning("No gaussian data loaded.", this);
-                return;
-            }
+        //[ContextMenu("Resort Visible Subset Procedural Gaussians")]
+        //public void ResortVisibleSubsetProceduralGaussians()
+        //{
+        //    if (_gaussians == null || _gaussians.Length == 0)
+        //    {
+        //        Debug.LogWarning("No gaussian data loaded.", this);
+        //        return;
+        //    }
 
-            if (proceduralRenderer == null)
-            {
-                Debug.LogError("ProceduralRenderer reference is missing.", this);
-                return;
-            }
+        //    if (proceduralRenderer == null)
+        //    {
+        //        Debug.LogError("ProceduralRenderer reference is missing.", this);
+        //        return;
+        //    }
 
-            Camera cam = Camera.main;
-            if (cam == null)
-            {
-                Debug.LogError("Main Camera not found.", this);
-                return;
-            }
+        //    Camera cam = Camera.main;
+        //    if (cam == null)
+        //    {
+        //        Debug.LogError("Main Camera not found.", this);
+        //        return;
+        //    }
 
-            Debug.Log("Filtering visible subset...", this);
-           
-            int[] visibleIndices = BuildVisibleSubsetIndices(
-                _gaussians,
-                cam,
-                proceduralRenderer.transform.localToWorldMatrix,
-                maxViewDistance,
-                viewportMargin
-            );
+        //    Debug.Log("Filtering visible subset...", this);
 
-            Debug.Log($"Visible subset count: {visibleIndices.Length}", this);
+        //    int[] visibleIndices = BuildVisibleSubsetIndices(
+        //        _gaussians,
+        //        cam,
+        //        proceduralRenderer.transform.localToWorldMatrix,
+        //        maxViewDistance,
+        //        viewportMargin
+        //    );
 
-            if (visibleIndices.Length == 0)
-            {
-                Debug.LogWarning("Visible subset is empty.", this);
-                return;
-            }
+        //    Debug.Log($"Visible subset count: {visibleIndices.Length}", this);
 
-            Debug.Log("Sorting visible subset by depth...", this);
-            SortIndicesByDepth(_gaussians, visibleIndices, cam);
+        //    if (visibleIndices.Length == 0)
+        //    {
+        //        Debug.LogWarning("Visible subset is empty.", this);
+        //        return;
+        //    }
 
-            Debug.Log("Rebuilding procedural chunks with visible sorted subset...", this);
-            proceduralRenderer.Build(_gaussians, visibleIndices);
+        //    Debug.Log("Sorting visible subset by depth...", this);
+        //    SortIndicesByDepth(_gaussians, visibleIndices, cam);
 
-            Debug.Log("Visible subset resort complete.", this);
-        }
+        //    Debug.Log("Rebuilding procedural chunks with visible sorted subset...", this);
+        //    proceduralRenderer.Build(_gaussians, visibleIndices);
 
-        private static void SortIndicesByDepth(GaussianData[] gaussians, int[] indices, Camera camera)
-        {
-            Transform camTransform = camera.transform;
-            Vector3 camPosition = camTransform.position;
-            Vector3 camForward = camTransform.forward;
+        //    Debug.Log("Visible subset resort complete.", this);
+        //}
 
-            Array.Sort(indices, (a, b) =>
-            {
-                float depthA = Vector3.Dot(gaussians[a].Position - camPosition, camForward);
-                float depthB = Vector3.Dot(gaussians[b].Position - camPosition, camForward);
+        //private static void SortIndicesByDepth(GaussianData[] gaussians, int[] indices, Camera camera)
+        //{
+        //    Transform camTransform = camera.transform;
+        //    Vector3 camPosition = camTransform.position;
+        //    Vector3 camForward = camTransform.forward;
 
-                // 远 -> 近
-                return depthB.CompareTo(depthA);
-            });
-        }
+        //    Array.Sort(indices, (a, b) =>
+        //    {
+        //        float depthA = Vector3.Dot(gaussians[a].Position - camPosition, camForward);
+        //        float depthB = Vector3.Dot(gaussians[b].Position - camPosition, camForward);
 
-        private static int[] BuildVisibleSubsetIndices(
-            GaussianData[] gaussians,
-            Camera camera,
-            Matrix4x4 localToWorld,
-            float maxViewDistance,
-            float viewportMargin)
-        {
-            List<int> visible = new List<int>(gaussians.Length / 4);
+        //        // 远 -> 近
+        //        return depthB.CompareTo(depthA);
+        //    });
+        //}
 
-            Transform camTransform = camera.transform;
-            Vector3 camPosition = camTransform.position;
-            Vector3 camForward = camTransform.forward;
-            float maxDistSqr = maxViewDistance * maxViewDistance;
+        //private static int[] BuildVisibleSubsetIndices(
+        //    GaussianData[] gaussians,
+        //    Camera camera,
+        //    Matrix4x4 localToWorld,
+        //    float maxViewDistance,
+        //    float viewportMargin)
+        //{
+        //    List<int> visible = new List<int>(gaussians.Length / 4);
 
-            float minViewport = -viewportMargin;
-            float maxViewport = 1f + viewportMargin;
+        //    Transform camTransform = camera.transform;
+        //    Vector3 camPosition = camTransform.position;
+        //    Vector3 camForward = camTransform.forward;
+        //    float maxDistSqr = maxViewDistance * maxViewDistance;
 
-            for (int i = 0; i < gaussians.Length; i++)
-            {
-                Vector3 worldPos = localToWorld.MultiplyPoint3x4(gaussians[i].Position);
+        //    float minViewport = -viewportMargin;
+        //    float maxViewport = 1f + viewportMargin;
 
-                Vector3 toPoint = worldPos - camPosition;
+        //    for (int i = 0; i < gaussians.Length; i++)
+        //    {
+        //        Vector3 worldPos = localToWorld.MultiplyPoint3x4(gaussians[i].Position);
 
-                // 1. 在相机前方
-                float forwardDepth = Vector3.Dot(toPoint, camForward);
-                if (forwardDepth <= 0f)
-                {
-                    continue;
-                }
+        //        Vector3 toPoint = worldPos - camPosition;
 
-                // 2. 距离不过远
-                if (toPoint.sqrMagnitude > maxDistSqr)
-                {
-                    continue;
-                }
+        //        // 1. 在相机前方
+        //        float forwardDepth = Vector3.Dot(toPoint, camForward);
+        //        if (forwardDepth <= 0f)
+        //        {
+        //            continue;
+        //        }
 
-                // 3. 在视口附近
-                Vector3 viewport = camera.WorldToViewportPoint(worldPos);
+        //        // 2. 距离不过远
+        //        if (toPoint.sqrMagnitude > maxDistSqr)
+        //        {
+        //            continue;
+        //        }
 
-                if (viewport.z <= 0f)
-                {
-                    continue;
-                }
+        //        // 3. 在视口附近
+        //        Vector3 viewport = camera.WorldToViewportPoint(worldPos);
 
-                if (viewport.x < minViewport || viewport.x > maxViewport ||
-                    viewport.y < minViewport || viewport.y > maxViewport)
-                {
-                    continue;
-                }
+        //        if (viewport.z <= 0f)
+        //        {
+        //            continue;
+        //        }
 
-                visible.Add(i);
-            }
+        //        if (viewport.x < minViewport || viewport.x > maxViewport ||
+        //            viewport.y < minViewport || viewport.y > maxViewport)
+        //        {
+        //            continue;
+        //        }
 
-            return visible.ToArray();
-        }
+        //        visible.Add(i);
+        //    }
+
+        //    return visible.ToArray();
+        //}
     }
 }

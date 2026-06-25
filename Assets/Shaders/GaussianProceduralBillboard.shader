@@ -60,6 +60,7 @@ Shader "GaussianSplatting/ProceduralBillboard"
             };
 
             StructuredBuffer<GaussianData> _Gaussians;
+            StructuredBuffer<uint> _Indices;
 
             float _AlphaScale;
             float _GaussianSharpness;
@@ -186,8 +187,10 @@ Shader "GaussianSplatting/ProceduralBillboard"
             v2f vert(uint vertexID : SV_VertexID, uint instanceID : SV_InstanceID)
             {
                 v2f o;
+                                
+                uint sourceIndex = _Indices[instanceID];
+                GaussianData g = _Gaussians[sourceIndex];
 
-                GaussianData g = _Gaussians[instanceID];
                 float2 corner = GetCornerUV(vertexID);
 
                 float4 q = g.rotation;
