@@ -34,6 +34,8 @@ namespace GaussianSplatting.Rendering
 
         private ComputeBuffer _depthKeyBuffer;
 
+        private int _activeIndexCount;
+
         public void Build(GaussianData[] gaussians)
         {
             ReleaseBuffers();
@@ -103,6 +105,8 @@ namespace GaussianSplatting.Rendering
 
             _depthKeyBuffer = new ComputeBuffer(_gaussianCount, 16);
 
+            _activeIndexCount = _gaussianCount;
+
             if (proceduralMaterial != null)
             {
                 proceduralMaterial.SetBuffer("_Gaussians", _gaussianBuffer);
@@ -120,7 +124,7 @@ namespace GaussianSplatting.Rendering
             );
         }
 
-        public void UpdateIndices(int[] sortedIndices)
+        public void UpdateIndices(int[] sortedIndices, int activeCount = -1)
         {
             if (_indexBuffer == null || _gaussianCount == 0)
             {
@@ -141,6 +145,32 @@ namespace GaussianSplatting.Rendering
             }
 
             _indexBuffer.SetData(gpuIndices);
+
+            if (activeCount < 0)
+            {
+                _activeIndexCount = _gaussianCount;
+            }
+            else
+            {
+                _activeIndexCount = Mathf.Clamp(activeCount, 0, _gaussianCount);
+            }
+        }
+
+        public void ResetIdentityIndices()
+        {
+            if (_indexBuffer == null || _gaussianCount == 0)
+            {
+                return;
+            }
+
+            uint[] identity = new uint[_gaussianCount];
+            for (int i = 0; i < _gaussianCount; i++)
+            {
+                identity[i] = (uint)i;
+            }
+
+            _indexBuffer.SetData(identity);
+            _activeIndexCount = _gaussianCount;
         }
 
         public void GenerateDepthKeys(Camera camera)
@@ -194,7 +224,7 @@ namespace GaussianSplatting.Rendering
 
         private void OnRenderObject()
         {
-            if (_gaussianBuffer == null || _indexBuffer == null || _gaussianCount == 0 || proceduralMaterial == null)
+            if (_gaussianBuffer == null || _indexBuffer == null || _activeIndexCount == 0 || proceduralMaterial == null)
             {
                 return;
             }
@@ -215,7 +245,7 @@ namespace GaussianSplatting.Rendering
             proceduralMaterial.SetFloat("_R2Cutoff", r2Cutoff);
 
             proceduralMaterial.SetPass(0);
-            Graphics.DrawProceduralNow(MeshTopology.Triangles, 6, _gaussianCount);
+            Graphics.DrawProceduralNow(MeshTopology.Triangles, 6, _activeIndexCount);
         }
 
         private void OnDisable()
@@ -249,6 +279,7 @@ namespace GaussianSplatting.Rendering
             }
 
             _gaussianCount = 0;
+            _activeIndexCount = 0;
         }
     }
 }
